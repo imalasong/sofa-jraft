@@ -56,13 +56,23 @@ public class CounterClient {
             throw new IllegalStateException("Refresh leader failed");
         }
 
-        final PeerId leader = RouteTable.getInstance().selectLeader(groupId);
+        PeerId leader = RouteTable.getInstance().selectLeader(groupId);
         System.out.println("Leader is " + leader);
         final int n = 1000;
         final CountDownLatch latch = new CountDownLatch(n);
         final long start = System.currentTimeMillis();
         for (int i = 0; i < n; i++) {
-            incrementAndGet(cliClientService, leader, i, latch);
+            try {
+                System.out.println("leader:"+leader.getPort());
+                incrementAndGet(cliClientService, leader, 1, latch);
+            }catch (Exception e){
+                e.printStackTrace();
+                if (!RouteTable.getInstance().refreshLeader(cliClientService, groupId, 1000).isOk()) {
+//                    throw new IllegalStateException("Refresh leader failed");
+                }
+                leader = RouteTable.getInstance().selectLeader(groupId);
+            }
+            Thread.sleep(1000*2);
         }
         latch.await();
         System.out.println(n + " ops, cost : " + (System.currentTimeMillis() - start) + " ms.");
@@ -77,6 +87,7 @@ public class CounterClient {
 
             @Override
             public void complete(Object result, Throwable err) {
+                System.out.println("incrementAndGet resultaaa:" + result);
                 if (err == null) {
                     latch.countDown();
                     System.out.println("incrementAndGet result:" + result);
