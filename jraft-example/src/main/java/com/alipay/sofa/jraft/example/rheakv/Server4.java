@@ -30,7 +30,7 @@ import com.alipay.sofa.jraft.util.Endpoint;
  *
  * @author jiachun.fjc
  */
-public class Server2 {
+public class Server4 {
 
     public static void main(final String[] args) throws Exception {
         final PlacementDriverOptions pdOpts = PlacementDriverOptionsConfigured.newConfigured()
@@ -40,12 +40,12 @@ public class Server2 {
                 .withStorageType(StorageType.RocksDB)
                 .withRocksDBOptions(RocksDBOptionsConfigured.newConfigured().withDbPath(Configs.DB_PATH).config())
                 .withRaftDataPath(Configs.RAFT_DATA_PATH)
-                .withServerAddress(new Endpoint("127.0.0.1", 8182))
+                .withServerAddress(new Endpoint("127.0.0.1", 8184))
                 .config();
         final RheaKVStoreOptions opts = RheaKVStoreOptionsConfigured.newConfigured() //
                 .withClusterName(Configs.CLUSTER_NAME) //
-                .withClusterId(Configs.CLUSTER_ID)
                 .withUseParallelCompress(true) //
+                .withClusterId(Configs.CLUSTER_ID)
                 .withInitialServerList(Configs.ALL_NODE_ADDRESSES)
                 .withStoreEngineOptions(storeOpts) //
                 .withPlacementDriverOptions(pdOpts) //
@@ -54,6 +54,6 @@ public class Server2 {
         final Node node = new Node(opts);
         node.start();
         Runtime.getRuntime().addShutdownHook(new Thread(node::stop));
-        System.out.println("server2 start OK");
+        System.out.println("server3 start OK");
     }
 }

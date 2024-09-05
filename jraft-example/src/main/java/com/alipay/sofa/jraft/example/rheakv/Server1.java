@@ -16,6 +16,8 @@
  */
 package com.alipay.sofa.jraft.example.rheakv;
 
+import com.alipay.sofa.jraft.rhea.client.DefaultRheaKVStore;
+import com.alipay.sofa.jraft.rhea.client.RheaKVStore;
 import com.alipay.sofa.jraft.rhea.options.PlacementDriverOptions;
 import com.alipay.sofa.jraft.rhea.options.RheaKVStoreOptions;
 import com.alipay.sofa.jraft.rhea.options.StoreEngineOptions;
@@ -25,6 +27,11 @@ import com.alipay.sofa.jraft.rhea.options.configured.RocksDBOptionsConfigured;
 import com.alipay.sofa.jraft.rhea.options.configured.StoreEngineOptionsConfigured;
 import com.alipay.sofa.jraft.rhea.storage.StorageType;
 import com.alipay.sofa.jraft.util.Endpoint;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+
+import java.io.File;
+import java.io.IOException;
 
 /**
  *
@@ -32,6 +39,19 @@ import com.alipay.sofa.jraft.util.Endpoint;
  */
 public class Server1 {
 
+
+    public static void main3(String[] args) throws IOException {
+        final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        final RheaKVStoreOptions opts = mapper.readValue(new File("/Users/xiaochangbai/workspaces/idea/sofa-jraft/jraft-example/src/main/resources/conf/rheakv/rheakv_example_node_1.yaml")
+                , RheaKVStoreOptions.class);
+        final RheaKVStore rheaKVStore = new DefaultRheaKVStore();
+        if (rheaKVStore.init(opts)) {
+            rheaKVStore.bPut("hello", "hello world!!!".getBytes());
+            byte[] bytesVal = rheaKVStore.bGet("hello");
+            System.out.println(new String(bytesVal));
+
+        }
+    }
     public static void main(final String[] args) {
         final PlacementDriverOptions pdOpts = PlacementDriverOptionsConfigured.newConfigured()
                 .withFake(true) // use a fake pd
@@ -44,6 +64,7 @@ public class Server1 {
                 .config();
         final RheaKVStoreOptions opts = RheaKVStoreOptionsConfigured.newConfigured() //
                 .withClusterName(Configs.CLUSTER_NAME) //
+                .withClusterId(Configs.CLUSTER_ID)
                 .withUseParallelCompress(true) //
                 .withInitialServerList(Configs.ALL_NODE_ADDRESSES)
                 .withStoreEngineOptions(storeOpts) //

@@ -45,6 +45,7 @@ public class Server3 {
         final RheaKVStoreOptions opts = RheaKVStoreOptionsConfigured.newConfigured() //
                 .withClusterName(Configs.CLUSTER_NAME) //
                 .withUseParallelCompress(true) //
+                .withClusterId(Configs.CLUSTER_ID)
                 .withInitialServerList(Configs.ALL_NODE_ADDRESSES)
                 .withStoreEngineOptions(storeOpts) //
                 .withPlacementDriverOptions(pdOpts) //
