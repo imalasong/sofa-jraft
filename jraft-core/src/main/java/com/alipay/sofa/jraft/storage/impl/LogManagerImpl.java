@@ -181,14 +181,17 @@ public class LogManagerImpl implements LogManager {
             lsOpts.setConfigurationManager(this.configManager);
             lsOpts.setLogEntryCodecFactory(opts.getLogEntryCodecFactory());
 
+            // 初始化日志存储服务
             if (!this.logStorage.init(lsOpts)) {
                 LOG.error("Fail to init logStorage");
                 return false;
             }
+            //基于日志初始化本地 logIndex 和 term 值
             this.firstLogIndex = this.logStorage.getFirstLogIndex();
             this.lastLogIndex = this.logStorage.getLastLogIndex();
             this.diskId = new LogId(this.lastLogIndex, getTermFromLogStorage(this.lastLogIndex));
             this.fsmCaller = opts.getFsmCaller();
+            //创建对应的 Disruptor 队列，用于异步处理日志操作相关的事件
             this.disruptor = DisruptorBuilder.<StableClosureEvent> newInstance() //
                     .setEventFactory(new StableClosureEventFactory()) //
                     .setRingBufferSize(opts.getDisruptorBufferSize()) //
@@ -415,6 +418,7 @@ public class LogManagerImpl implements LogManager {
                     writtenSize += entry.getData() != null ? entry.getData().remaining() : 0;
                 }
                 this.nodeMetrics.recordSize("append-logs-bytes", writtenSize);
+                // 将 LogEntry 写入 RocksDB
                 final int nAppent = this.logStorage.appendEntries(toAppend);
                 if (nAppent != entriesCount) {
                     LOG.error("**Critical error**, fail to appendEntries, nAppent={}, toAppend={}", nAppent,
@@ -451,8 +455,10 @@ public class LogManagerImpl implements LogManager {
 
         LogId flush() {
             if (this.size > 0) {
+                // 将数据落盘，并返回最新的 LogId
                 this.lastId = appendToStorage(this.toAppend);
                 for (int i = 0; i < this.size; i++) {
+                    // 清空缓存的 LogEntry 数据
                     this.storage.get(i).getEntries().clear();
                     Status st = null;
                     try {
@@ -461,6 +467,7 @@ public class LogManagerImpl implements LogManager {
                         } else {
                             st = Status.OK();
                         }
+                        // 回调响应
                         this.storage.get(i).run(st);
                     } catch (Throwable t) {
                         LOG.error("Fail to run closure with status: {}.", st, t);
@@ -873,12 +880,15 @@ public class LogManagerImpl implements LogManager {
         LastLogIdClosure c;
         this.readLock.lock();
         try {
+            // 直接返回内存中记录的 lastLogIndex，以及对应的 term 值
             if (!isFlush) {
                 if (this.lastLogIndex >= this.firstLogIndex) {
                     return new LogId(this.lastLogIndex, unsafeGetTerm(this.lastLogIndex));
                 }
                 return this.lastSnapshotId;
-            } else {
+            } else {  // 将内存中的数据刷盘，并返回最新的 logIndex 和对应的 term 值
+
+                // 生成快照之后未产生新的数据
                 if (this.lastLogIndex == this.lastSnapshotId.getIndex()) {
                     return this.lastSnapshotId;
                 }
@@ -887,8 +897,10 @@ public class LogManagerImpl implements LogManager {
         } finally {
             this.readLock.unlock();
         }
+        // 往消息队列中发布一个 LAST_LOG_ID 事件
         offerEvent(c, EventType.LAST_LOG_ID);
         try {
+            // 等待刷盘完成
             c.await();
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -1155,12 +1167,13 @@ public class LogManagerImpl implements LogManager {
         try {
             Requires.requireTrue(this.firstLogIndex > 0);
             Requires.requireTrue(this.lastLogIndex >= 0);
+            // 未生成过快照，所以 firstLogIndex 应该是 1
             if (this.lastSnapshotId.equals(new LogId(0, 0))) {
                 if (this.firstLogIndex == 1) {
                     return Status.OK();
                 }
                 return new Status(RaftError.EIO, "Missing logs in (0, %d)", this.firstLogIndex);
-            } else {
+            } else { // 生成过快照，则需要保证快照与当前数据的连续性
                 if (this.lastSnapshotId.getIndex() >= this.firstLogIndex - 1
                     && this.lastSnapshotId.getIndex() <= this.lastLogIndex) {
                     return Status.OK();
